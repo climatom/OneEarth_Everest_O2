@@ -46,7 +46,6 @@ prep=np.tile(p,(nt,1))
 pcol=interp_vert(prep,z,scol)
 pcol=pd.Series(pcol,index=data.time.values[:])
 pcol.to_csv(fout_p)
-print(pcol.index[-1])
 
 # Interp temp and write out
 tcol=interp_vert(t,z,scol)
