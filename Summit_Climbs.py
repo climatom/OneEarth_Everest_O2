@@ -94,11 +94,45 @@ def dz2p(grad,p1,dz):
     p2=p1*np.exp(grad*dz)
     
     return p2
+
+def icao(zm):
+    
+    """
+    Uses the ICAO standard atmosphere as defined In Ward et al. (2000) p. 26
+    to model the air pressure at height zm (m)
+    
+    Input: height in metres
+    Output: pressure in hPa
+    """
+    
+    zf=zm*3.28084
+    p0=760. # mmHg
+    p=p0*(288./(288.-1.98*zf/1000.))**-5.256
+    p=p*1.33322
+    return p
+
+def west93(zm):
+ 
+    """
+    Uses the equation provided by Ward et al. (2000) p. 29 to compute air 
+    pressure as f(zm). Note: based on results. 
+    
+    Input: height in metres
+    Output: pressure in hPa
+    """
+    zm=zm/1000.
+    p=np.exp(6.63268-0.1112*zm-0.00149*zm**2)*1.33322
+    return p
+    
+    
+    
     
 # Filenames
 finc="/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/members_and_hired_everest.csv"
 fino="/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/summit_recon.csv"
 out="/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/o2_climbs.csv"
+si="/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/SI_brief.csv"
+si_full="/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/SI_full.csv"
 fstat="/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/doy_summit.txt"
 figo="/home/lunet/gytm3/Everest2019/Research/OneEarth/Figures/summit_o2.pdf"
 figo2="/home/lunet/gytm3/Everest2019/Research/OneEarth/Figures/summit_o2.png"
@@ -122,9 +156,10 @@ rwint=wind.loc[idx_wint].corr()
 
 # Pull out no-O2
 no=climbs.loc[np.logical_and(climbs["o2none"]==1,climbs["mperhighpt"]==8850)]; 
-no2=no.loc[np.logical_and(np.logical_and(no["o2none"]==1,no["smtcnt"]>1),\
+no2=no.loc[np.logical_and(np.logical_and(no["o2none"]==1,no["smtcnt"]==2),\
                           no["mperhighpt"]==8850)]
-  
+no3=no.loc[np.logical_and(np.logical_and(no["o2none"]==1,no["smtcnt"]==3),\
+                          no["mperhighpt"]==8850)]
 # With o2
 wo=climbs.loc[np.logical_and(climbs["o2none"]==0,climbs["mperhighpt"]==8850)] 
 wo2=wo.loc[np.logical_and(np.logical_and(wo["o2none"]==0,wo["smtcnt"]==2),\
@@ -136,11 +171,13 @@ wo3=wo.loc[np.logical_and(np.logical_and(wo["o2none"]==0,wo["smtcnt"]==3),\
 # Get datetimes
 dates1,meta1=himDate(no["msmtdate1"],no["dsmttime1"],verb=False)
 dates2,meta2=himDate(no2["msmtdate2"],no2["dsmttime2"],verb=False)
-dates=np.concatenate((dates1,dates2))
+dates3,meta3=himDate(no3["msmtdate3"],no3["dsmttime3"],verb=False)
+dates=np.concatenate((dates1,dates2,dates3))
+no_comb=pd.concat([no,no2,no3])  
 years=np.concatenate((meta1[0],meta2[0]))
-months=np.concatenate((meta1[1],meta2[1]))
-days=np.concatenate((meta1[2],meta2[2]))
-hours=np.concatenate((meta1[3],meta2[3]))
+months=np.concatenate((meta1[1],meta2[1],meta3[1]))
+days=np.concatenate((meta1[2],meta2[2],meta3[2]))
+hours=np.concatenate((meta1[3],meta2[3],meta3[3]))
 
 # Ditto for o2
 dates1_o,meta1_o=himDate(wo["msmtdate1"],wo["dsmttime1"],verb=False)
@@ -163,17 +200,19 @@ stdhour=np.std(hours)
 o2_climb=np.zeros(len(dates))*np.nan
 
 # Note that here we convert O2 UTC times to NPT
-ref_times=o2.index-datetime.timedelta(hours=6)
+ref_times=o2.index+datetime.timedelta(hours=6)
 
 # Create a secondary time vector -- to store the resultant date
 res_date=[]
 estimated=0
+no_meta=pd.DataFrame()
 for i in range(len(dates)):
     idx = ref_times==dates[i]
     if idx.any():
         # For those cases *with* an hour -- straightforward extract
         o2_climb[i]=o2.values[idx]
         res_date.append(dates[i])
+        no_meta=no_meta.append(no_comb.iloc[i])
     # For those *without* an hour -- we figure out the *row* in the o2 dataset, 
     # and use this to cut out the *day*, before applying a Gaussian filter 
     # (stdev = 6 hours) and taking the 12th value
@@ -190,14 +229,21 @@ for i in range(len(dates)):
                                    np.mean(scratch))
             o2_climb[i]=filt[scratch_hours==12] 
             res_date.append(date_est)
+            no_meta=no_meta.append(no_comb.iloc[i])
             estimated+=1
-        else: continue
+            
+        else: print dates[i]; continue
+no_meta["datetime"]=res_date
+no_meta.set_index("datetime",inplace=True)
 print("Estimated %.0f" % estimated) 
+
 
 # Convert to series and write out
 o2_climb=pd.Series(o2_climb[~np.isnan(o2_climb)],index=res_date)      
 o2_climb.to_csv(out)   
 date_mask=o2_climb.isin(dates)
+no_meta["Press"]=o2_climb.values[:]
+sorted_o2=no_meta.sort_values(by=["Press"])
 
 # Repeat for w_o2
 wo2_climb=np.zeros(len(dates_o))*np.nan
@@ -250,7 +296,8 @@ theta=2*np.pi/366.*doy
 fig1=plt.figure()
 ax=fig1.add_subplot(111, projection='polar')
 # Repeat the 5th points to avoid artefact
-ax.plot(np.append(theta,theta[0]), np.append(mus,mus[0]), color="blue")
+ax.plot(np.append(theta,theta[0]), np.append(mus,mus[0]), color="blue",\
+        label="This study")
 ax.fill_between(np.append(theta,theta[0]),\
                 np.append(mins,mins[0]), np.append(maxs,maxs[0]),\
                 color="blue",alpha=0.2,linewidth=0)
@@ -272,8 +319,26 @@ mins2=np.ones(len(doy))*o2_climb.min()
 maxs2=np.ones(len(doy))*o2_climb.max()
 # Get LTM from the entire dataset -- inc. full years only
 muall=np.mean(o2.loc[o2.index.year<2020])
-ax.plot(theta,np.ones(len(theta))*muall[0],color='k',linestyle="--")
+ax.plot(theta,np.ones(len(theta))*muall[0],color='k',linestyle="-",label="LTM")
 ax.set_title("Summit Pressure (hPa)",pad=15)
+
+##** For review -- add the ICAO mean and the West mean
+ic=icao(8850.)
+west=west93(8850.)
+ax.plot(theta,np.ones(len(theta))*ic,color='k',linestyle="dashed",label="ICAO")
+ax.plot(theta,np.ones(len(theta))*west,color='k',linestyle="dotted",label=\
+        "West '96")
+# Read in the digitized West data
+west_stdv=2.024 # hPa (see Excel workbook on OneDrive)
+west_dig=pd.read_csv(\
+    "/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/west1993.csv",\
+    index_col=0)
+ax.plot(theta_points,west_dig["hPa"].values[:],linestyle="dashdot",color='k',\
+        label="West '83")
+#ax.plot(theta_points[:-1],west_dig["hPa"].values[:])
+#ax.errorbar(theta_points,west_dig["hPa"].values[:],west_stdv,color='green',marker='s')
+ax.legend(bbox_to_anchor=(0.555, 0.82, 0.2, 0.2),ncol=2)
+
 plt.tight_layout()
 fig1.savefig(figo,dpi=300)
 fig1.savefig(figo2,dpi=300)
@@ -305,15 +370,35 @@ may_mean_grad=grad.loc[grad.index.month==5].mean()
 may_mean_vo2=p2o(p.loc[p.index.month==5]).mean()
 
 # Convert all the pressures to dz/zs under May-like conditions
-dzs,zs=dp2dz(may_mean_p.values[0],p,may_mean_grad.values[0],8848.)
+dzs,zs=dp2dz(may_mean_p.values[0],p,may_mean_grad.values[0],8850.)
+
+### From review
+# Change in elevation from 2C warming
+delta=2.57*2.0
+p_min=p.min()
+p_new=p.min()+delta
+zcurrent=dp2dz(may_mean_p.values[0],p_min,may_mean_grad.values[0],8850.)
+znew=dp2dz(may_mean_p.values[0],p_new,may_mean_grad.values[0],8850.)
+
+# Again under climbing-only conditions
+dzs_climb,zs_climb=dp2dz(may_mean_p.values[0],o2_climb.values[:],\
+                         may_mean_grad.values[0],8850.)
+zs_climb=pd.Series(zs_climb,index=o2_climb.index)
+assert (zs_climb.index == no_meta.index).all()
+no_meta["Perceived Elevation (m)"]=zs_climb.values[:]
+assert (o2_climb.index == no_meta.index).all()
+no_meta["Air Pressure (hPa)"]=o2_climb.values[:]
+
 # Biggest diff?
 max_diff_z=dzs.max()-dzs.min()
 print("Max diff in apparent z is: %.2f" % max_diff_z.values[0])
 # Biggest diff in o2?
 vo2_all=p2o(p)
 vo2_climb=p2o(o2_climb)
-max_diff_o=vo2_all.max()/vo2_all.min()*100.
-print("Max diff in  O2 [ohigh/olow]is: %.2f%%" % max_diff_o.values[0])
+max_diff_o=100-vo2_all.min()/vo2_all.max()*100.
+print("Max reduction in  O2 is [100-olow/ohigh*100]is: %.2f%%" % max_diff_o.values[0])
+print("Reduction in O2 non-climb/climb: %.2f%%"%\
+      (100-vo2_all.min()/vo2_climb.min()*100.))
 print("Max O2 climbs [(ohigh-maymean)/maymean] is: %.2f%%" % \
       ((vo2_climb.max()-may_mean_vo2)/may_mean_vo2*100))
 print("Min O2 climbs [(olow-maymean)/maymean] is: %.2f%%" % \
@@ -340,6 +425,34 @@ labs=np.array(["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct",\
 axes[0].boxplot(pseq,whis=10,meanline=True,showmeans=True,medianprops=medianprops,\
            labels=labs[order])
 
+
+# Sort meta on perceived elevation and write out
+no_meta=no_meta.sort_values(by="Perceived Elevation (m)",ascending=False)
+# Create rank and copy key info across 
+rank=[]; yr_out=[]; mon_out=[]; day_out=[]; hr_out=[]
+rank_i=1
+for i in range(len(no_meta["Perceived Elevation (m)"])):
+    yr_out.append(no_meta.index[i].year)
+    mon_out.append(no_meta.index[i].month)
+    day_out.append(no_meta.index[i].day)
+    hr_out.append(no_meta.index[i].hour)
+    if i >0:
+        if no_meta["Perceived Elevation (m)"].values[i]<\
+        no_meta["Perceived Elevation (m)"].values[i-1]: rank_i+=1
+    rank.append(rank_i)
+no_meta["Rank"]=rank; no_meta["Year"]=yr_out; no_meta["Month"]=mon_out
+no_meta["Day"]=day_out; no_meta["Hour"]=hr_out
+
+# Output for SI (no names)
+no_meta_out=no_meta[["Rank","name","Year","Month","Day","Hour","Air Pressure (hPa)",\
+                     "Perceived Elevation (m)"]]
+no_meta_out.to_csv(si)
+# Output for SI (names)
+no_meta_out_full=no_meta_out[["Rank","name","Year","Month","Day","Hour","Air Pressure (hPa)",\
+                     "Perceived Elevation (m)"]]
+no_meta_out_full["dz"]=no_meta_out["Perceived Elevation (m)"]-8850.
+no_meta_out.to_csv(si_full)
+
 # Now plot the dzs for the climbers
 for i in range(len(order)):
     scratch=o2_climb.loc[o2_climb.index.month==(order[i]+1)]
@@ -350,40 +463,49 @@ for i in range(len(order)):
     elif nc==1:
         
         ymu,dump=dp2dz(may_mean_p.values[0],scratch,\
-                       may_mean_grad.values[0],8848.)
+                       may_mean_grad.values[0],8850.)
         axes[0].scatter(i+1,ymu,color="red",marker="o",s=25)
 
         
     elif nc==2:
         
          ymin,dump=dp2dz(may_mean_p.values[0],scratch.max(),\
-                       may_mean_grad.values[0],8848.)    
+                       may_mean_grad.values[0],8850.)    
     
          ymax,dump=dp2dz(may_mean_p.values[0],scratch.min(),\
-                       may_mean_grad.values[0],8848.)  
+                       may_mean_grad.values[0],8850.)  
          axes[0].plot([i+1.01,i+1.01],[ymax,ymin],color="red")
 
     else:
         
          ymin,dump=dp2dz(may_mean_p.values[0],scratch.max(),\
-                       may_mean_grad.values[0],8848.)    
+                       may_mean_grad.values[0],8850.)    
     
          ymu,dump=dp2dz(may_mean_p.values[0],scratch.mean(),\
-                       may_mean_grad.values[0],8848.)    
+                       may_mean_grad.values[0],8850.)    
     
          ymax,dump=dp2dz(may_mean_p.values[0],scratch.min(),\
-                       may_mean_grad.values[0],8848.)        
+                       may_mean_grad.values[0],8850.)        
         
          axes[0].scatter(i+1,ymu,color="red",marker="o",s=25)
          axes[0].plot([i+1.01,i+1.01],[ymax,ymin],color="red")
 
-         
-# Now figure out the remaning axes
+# # # Added from review -- compare the different methods for estimating pressure
+zrefs=np.linspace(8500,10000,100)
+dzrefs=zrefs-8850
+me_p=dz2p(may_mean_grad.values[0],may_mean_p.values[0],dzrefs)
+west_p=west93(zrefs)
+fig,ax=plt.subplots(1,1)
+ax.plot(zrefs,me_p,color="black")
+ax.plot(zrefs,west_p,color="grey")
+ax.grid()
+
+# Now figure out the remaining axes
 # Set the second y-axis to be abs height
 yticks=[-200,-100,0,100,200,300,400,500,600]
 axes[0].axhline(0,color='k')
-axes[1].set_ylim(8848+yticks[0],8848+yticks[-1])
-axes[1].set_yticks(np.array(yticks)+8848)
+axes[1].set_ylim(8850+yticks[0],8850+yticks[-1])
+axes[1].set_yticks(np.array(yticks)+8850)
 
 # Set the third y-axis to be %o2 -- use the labels of the main y-axis to 
 # determine o2
@@ -425,6 +547,7 @@ dp=o2_climb.max()-o2_climb.min()
 #rato=p2o(o2_climb.max())/p2o(o2_climb.min())
 rato=p2o(o2_climb.min())/p2o(o2_climb.max())
 do=100-p2o(o2_climb.min())/p2o(o2_climb.max())*100. 
+
 
 print("Delta pressure = %.2f hPa" % dp)
 print("... reduction in o2 of %.2f%%" % do)
@@ -479,3 +602,17 @@ for m in range(1,13):
     table[m-1,7]=mu_mon_climb
     table[m-1,8]=mon_quant
     
+
+# For review -- illustrate the curvilinear relationship between Pio and VO2 max
+ref=np.linspace(200,1000,100)
+vo2=p2o(ref)
+frac=0.2095 # Volume fraction of O2 in the atmopshere 
+satvp=GF.satVpBolton(37.0)/100.
+pio=frac*(ref-satvp) # partial pressure of oxygen in inspired air
+fig,ax=plt.subplots(1,1)
+ax.plot(pio,vo2,color='k')
+ax.grid()
+ax.set_xlabel("Partial pressure of inspired oxygen (hPa)")
+ax.set_ylabel("VO$_{2}$max (ml kg$^{-1}$ min$^{-1}$)")
+fig.savefig("/home/lunet/gytm3/Everest2019/Research/OneEarth/Figures/FigR1.tif",\
+            dpi=300)

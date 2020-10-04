@@ -134,6 +134,12 @@ dummy_max=years*beta_max+int_max
 dummy_max_lower=(years-np.mean(years))*beta_max_lower+np.mean(dummy_max)
 dummy_max_upper=(years-np.mean(years))*beta_max_upper+np.mean(dummy_max)
 
+
+# # # From Review
+max_resid=np.array([ii[0] for ii in maxs.values])-dummy_max
+min_resid=np.array([ii[0] for ii in mins.values])-dummy_min
+rminmax=np.corrcoef(max_resid,min_resid)
+assert 1==2
 # Convert to f(Temp) (hard coded from tempChanges.py)
 beta_max_temp=beta_max*10*1/0.169
 beta_max_lower_temp=beta_max_lower*10*1/0.169

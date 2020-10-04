@@ -233,7 +233,7 @@ for d in range(len(dates)):
 ax3=fig.add_axes([0.13,0.09,0.82,0.22])
 a1=ax3.scatter(wind.loc[wint_idx]["p"],wind.loc[wint_idx]["u"],\
             color="k",s=0.2,alpha=0.1,label='')
-sns.kdeplot(wind.loc[wint_idx]["p"],wind[wint_idx]["u"],ax=ax3,color="green")
+sns.kdeplot(wind.loc[wint_idx]["p"],wind[wint_idx]["u"],ax=ax3,color="white")
 a2=ax3.scatter(samp[:,0],samp[:,1],color="red",label="mean")
 a3=ax3.scatter(samp[:,0],samp[:,2],color="Purple",label="max")
 ax3.set_xlabel("P$_{s}$ (hPa)")
