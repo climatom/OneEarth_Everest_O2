@@ -167,7 +167,7 @@ anom=np.zeros(len(data))
 clim=np.zeros(len(data))
 for i in range(len(uind)):
     mu[i]=np.mean(data.loc[ind==uind[i]])
-#mu=gaussian_filter1d(mu,sigma=2,mode="wrap")
+
 for i in range(len(uind)):
     anom[ind==uind[i]]=data["p"].loc[ind==uind[i]]-mu[uind==uind[i]]
     clim[ind==uind[i]]=mu[uind==uind[i]]
@@ -247,7 +247,7 @@ rspr=wind.loc[spr_idx].corr()
 ax3.text(332,10,"r = %.2f" % rwint["p"]["u"])
 ax3.set_yticks([15,30,45,60,75])
 ax3.grid()
-fig.savefig(fdir+"circulation.png",dpi=300)
+fig.savefig(fdir+"Fig3.pdf",dpi=300)
 
 print("Mean travel time = %.2f (%.2f - %.2f) days" % (mu_travel,\
       pclower_travel,pcupper_travel))

@@ -31,7 +31,7 @@ fout_w=di+"Summit_wind_Era5.csv"
 data=xa.open_dataset(fin)
 scol=7945.
 bal=8430.
-summit=8848.
+summit=8850.
 g=9.80665
 
 # Extract/manipulate

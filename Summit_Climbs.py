@@ -134,11 +134,11 @@ out="/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/o2_climbs.csv"
 si="/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/SI_brief.csv"
 si_full="/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/SI_full.csv"
 fstat="/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/doy_summit.txt"
-figo="/home/lunet/gytm3/Everest2019/Research/OneEarth/Figures/summit_o2.pdf"
+figo="/home/lunet/gytm3/Everest2019/Research/OneEarth/Figures/Fig2.pdf"
 figo2="/home/lunet/gytm3/Everest2019/Research/OneEarth/Figures/summit_o2.png"
 fwind="/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/Summit_wind_Era5.csv"
 fgrad="/home/lunet/gytm3/Everest2019/Research/OneEarth/Data/gradient.csv"
-figo3="/home/lunet/gytm3/Everest2019/Research/OneEarth/Figures/climbs_details.png"
+figo3="/home/lunet/gytm3/Everest2019/Research/OneEarth/Figures/Fig4.pdf"
 
 # Read in 
 climbs=pd.read_csv(finc)
@@ -232,10 +232,12 @@ for i in range(len(dates)):
             no_meta=no_meta.append(no_comb.iloc[i])
             estimated+=1
             
-        else: print dates[i]; continue
+        else: 
+            #print dates[i] 
+            continue
 no_meta["datetime"]=res_date
 no_meta.set_index("datetime",inplace=True)
-print("Estimated %.0f" % estimated) 
+#print("Estimated %.0f" % estimated) 
 
 
 # Convert to series and write out
@@ -379,6 +381,8 @@ p_min=p.min()
 p_new=p.min()+delta
 zcurrent=dp2dz(may_mean_p.values[0],p_min,may_mean_grad.values[0],8850.)
 znew=dp2dz(may_mean_p.values[0],p_new,may_mean_grad.values[0],8850.)
+# Height for 302 hPa
+zmax=dp2dz(may_mean_p.values[0],302.,may_mean_grad.values[0],8850.)
 
 # Again under climbing-only conditions
 dzs_climb,zs_climb=dp2dz(may_mean_p.values[0],o2_climb.values[:],\
@@ -396,7 +400,8 @@ print("Max diff in apparent z is: %.2f" % max_diff_z.values[0])
 vo2_all=p2o(p)
 vo2_climb=p2o(o2_climb)
 max_diff_o=100-vo2_all.min()/vo2_all.max()*100.
-print("Max reduction in  O2 is [100-olow/ohigh*100]is: %.2f%%" % max_diff_o.values[0])
+print("Max reduction in  O2 is [(100-olow/ohigh)*100]is: %.2f%%" % \
+                                max_diff_o.values[0])
 print("Reduction in O2 non-climb/climb: %.2f%%"%\
       (100-vo2_all.min()/vo2_climb.min()*100.))
 print("Max O2 climbs [(ohigh-maymean)/maymean] is: %.2f%%" % \
@@ -408,8 +413,8 @@ print("Max O2 all [(ohigh-maymean)/maymean] is: %.2f%%" % \
 print("Min O2 all [(olow-maymean)/maymean] is: %.2f%%" % \
       ((vo2_all.min()-may_mean_vo2)/may_mean_vo2*100))
 # Remind when we had min/max pressures (irrespective of climbs)
-print("Rememeber -- min press was: ", p["p"].loc[p["p"]==p["p"].min()])
-print("Rememeber -- max press was: " ,p["p"].loc[p["p"]==p["p"].max()])
+#print("Rememeber -- min press was: ", p["p"].loc[p["p"]==p["p"].min()])
+#print("Rememeber -- max press was: " ,p["p"].loc[p["p"]==p["p"].max()])
 
 
 # Take care of ordering and plotting
@@ -444,11 +449,11 @@ no_meta["Rank"]=rank; no_meta["Year"]=yr_out; no_meta["Month"]=mon_out
 no_meta["Day"]=day_out; no_meta["Hour"]=hr_out
 
 # Output for SI (no names)
-no_meta_out=no_meta[["Rank","name","Year","Month","Day","Hour","Air Pressure (hPa)",\
+no_meta_out=no_meta[["Rank","Year","Month","Day","Hour","Air Pressure (hPa)",\
                      "Perceived Elevation (m)"]]
 no_meta_out.to_csv(si)
 # Output for SI (names)
-no_meta_out_full=no_meta_out[["Rank","name","Year","Month","Day","Hour","Air Pressure (hPa)",\
+no_meta_out_full=no_meta[["Rank","name","Year","Month","Day","Hour","Air Pressure (hPa)",\
                      "Perceived Elevation (m)"]]
 no_meta_out_full["dz"]=no_meta_out["Perceived Elevation (m)"]-8850.
 no_meta_out.to_csv(si_full)
@@ -457,7 +462,7 @@ no_meta_out.to_csv(si_full)
 for i in range(len(order)):
     scratch=o2_climb.loc[o2_climb.index.month==(order[i]+1)]
     nc=len(scratch)
-    print("Index = %.0f, Month = %.0f, nc = %.0f" % (order[i],order[i]+1,nc))
+    #print("Index = %.0f, Month = %.0f, nc = %.0f" % (order[i],order[i]+1,nc))
     if nc==0: 
         continue
     elif nc==1:
@@ -490,16 +495,6 @@ for i in range(len(order)):
          axes[0].scatter(i+1,ymu,color="red",marker="o",s=25)
          axes[0].plot([i+1.01,i+1.01],[ymax,ymin],color="red")
 
-# # # Added from review -- compare the different methods for estimating pressure
-zrefs=np.linspace(8500,10000,100)
-dzrefs=zrefs-8850
-me_p=dz2p(may_mean_grad.values[0],may_mean_p.values[0],dzrefs)
-west_p=west93(zrefs)
-fig,ax=plt.subplots(1,1)
-ax.plot(zrefs,me_p,color="black")
-ax.plot(zrefs,west_p,color="grey")
-ax.grid()
-
 # Now figure out the remaining axes
 # Set the second y-axis to be abs height
 yticks=[-200,-100,0,100,200,300,400,500,600]
@@ -530,17 +525,28 @@ axes[2].set_ylabel("$\Delta$VO$_{2}$ max (%)")
 axes[0].legend(loc=1)
 plt.subplots_adjust(right=0.75)
 fig.savefig(figo3,dpi=300)
+
+# # # Added from review -- compare the different methods for estimating pressure
+zrefs=np.linspace(8500,10000,100)
+dzrefs=zrefs-8850
+me_p=dz2p(may_mean_grad.values[0],may_mean_p.values[0],dzrefs)
+west_p=west93(zrefs)
+fig,ax=plt.subplots(1,1)
+ax.plot(zrefs,me_p,color="black")
+ax.plot(zrefs,west_p,color="grey")
+ax.grid()
+
 # ---------------------------------------------
 # End main plot
 # ---------------------------------------------
 
 
 # Some more summaries
-print("Mean pressure during climbs = %.2f hPa" % o2_climb.mean())
+#print("Mean pressure during climbs = %.2f hPa" % o2_climb.mean())
 deltas=np.zeros(len(o2_climb))
 for i in range(len(o2_climb)):
     deltas[i]=o2_climb.values[i]-mus[doy==o2_climb.index.dayofyear[i]]
-print("Mean anomaly during climbs = %.2f hPa" % np.mean(deltas))
+#print("Mean anomaly during climbs = %.2f hPa" % np.mean(deltas))
 
 # Max-min O2 difference? 
 dp=o2_climb.max()-o2_climb.min()
@@ -549,13 +555,13 @@ rato=p2o(o2_climb.min())/p2o(o2_climb.max())
 do=100-p2o(o2_climb.min())/p2o(o2_climb.max())*100. 
 
 
-print("Delta pressure = %.2f hPa" % dp)
-print("... reduction in o2 of %.2f%%" % do)
-print("... ratio in pressure of %.3f%%" % rato)
+#print("Delta pressure = %.2f hPa" % dp)
+#print("... reduction in o2 of %.2f%%" % do)
+#print("... ratio in pressure of %.3f%%" % rato)
 
 # Dates of min/max?
-print("Max O2 on:" , o2_climb.loc[o2_climb==o2_climb.max()].index)
-print("Min O2 on:" , o2_climb.loc[o2_climb==o2_climb.min()].index)
+#print("Max O2 on:" , o2_climb.loc[o2_climb==o2_climb.max()].index)
+#print("Min O2 on:" , o2_climb.loc[o2_climb==o2_climb.min()].index)
 
 # What % of Jan Days exceed the mean may pressure
 frac_jan_may=np.sum(o2.loc[o2.index.month==1]>o2.loc[o2.index.month==5].mean())/\
@@ -568,7 +574,7 @@ ang=o2_climb.loc[o2_climb.index.month==12]
 may=o2.loc[o2.index.month==5]
 # higher than what fraction of May climbs?
 fra_ang_may=100-np.sum(may>ang[0])/np.float(len(may))*100
-print("%.2f%% of hours in May < Ang Rita" % fra_ang_may)
+#print("%.2f%% of hours in May < Ang Rita" % fra_ang_may)
 
 # Maximum excursion below mean?
 max_ex=mus-mins; print("Max excursion below mean = %.2f on day %.02f" % \

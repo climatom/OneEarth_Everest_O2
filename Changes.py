@@ -137,9 +137,9 @@ dummy_max_upper=(years-np.mean(years))*beta_max_upper+np.mean(dummy_max)
 
 # # # From Review
 max_resid=np.array([ii[0] for ii in maxs.values])-dummy_max
-min_resid=np.array([ii[0] for ii in mins.values])-dummy_min
-rminmax=np.corrcoef(max_resid,min_resid)
-assert 1==2
+mu_resid=np.array([ii[0] for ii in mus.values])-dummy_mu
+rmumax=np.corrcoef(max_resid,mu_resid)
+
 # Convert to f(Temp) (hard coded from tempChanges.py)
 beta_max_temp=beta_max*10*1/0.169
 beta_max_lower_temp=beta_max_lower*10*1/0.169
@@ -355,7 +355,7 @@ climbs=pd.read_csv(climbsf,index_col=0,parse_dates=True,names=["p"])
 mu=np.mean(climbs); mx=np.max(climbs); mn=np.min(climbs)
 ax.scatter(0,mu,color='green')
 ax.plot([0,0],[mn,mx],color='green')
-fig.savefig(figdir+"Changes.png",dpi=300)
+fig.savefig(figdir+"Fig5.pdf",dpi=300)
 
 # What is the % change in VO2 max? (For t change of 1C)
 # Use the regression to summarise this. 
